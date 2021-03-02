@@ -6,7 +6,7 @@ Requires=docker.service
 [Service]
 TimeoutStartSec=0
 Restart=Always
-ExecStart=/usr/bin/docker run -p 1883:1883 -p 9001:9001  {{ image_name }} --name {{ name }}
+ExecStart=/usr/bin/docker run -p 1883:1883 -p 9001:9001 --name {{ name }}  {{ image_name }} 
 ExecStop=/usr/bin/docker stop --ignore {{ name }}
 ExecStopPost=/usr/bin/docker rm -f {{ name }}
 

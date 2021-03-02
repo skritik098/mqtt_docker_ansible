@@ -1,12 +1,41 @@
 ---
 # tasks file for mqtt_container
-
-- name: Install docker package for Ubuntu
-  apt:
-    name: "docker-ce"
-    state: present
-  become: yes
+# - name: Run the equivalent of "apt-get update" as a separate step
+- name: Install aptitude using apt
+  apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
   when: ansible_facts['os_family'] == "Debian"
+  become: true
+
+
+- name: Install required system packages
+  apt: name={{ item }} state=latest update_cache=yes
+  loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+  when: ansible_facts['os_family'] == "Debian"
+  become: true
+
+- name: Add Docker GPG apt Key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+  become: true
+
+- name: Add Docker Repository
+  apt_repository:
+    repo: deb https://download.docker.com/linux/ubuntu bionic stable
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+  become: true
+
+- name: Update apt and install docker-ce
+  apt: update_cache=yes name=docker-ce state=latest
+  when: ansible_facts['os_family'] == "Debian"
+  become: true
+
+- name: Install Docker Module for Python
+  pip:
+    name: docker
+  become: true
 
 - name: Start the docker service for Ubuntu
   service:
@@ -14,10 +43,13 @@
     state: started
     enabled: true
   when: ansible_facts['os_family'] == "Debian"
+  become: true
 
 - name: Install podman package for Rhel
   yum:
-    name: "container-tools"
+    name: 
+        - "podman"
+        - "firewalld"
     state: present
   become: yes
   when: ansible_facts['os_family'] == "RedHat"
@@ -40,23 +72,53 @@
 
 - name: Copy the docker start service file for lunch
   template:
-    src: "{{ roles_path }}/templates/docker.mqtt.service.j2"
+    src: "docker.mqtt.service.j2"
     dest: "/etc/systemd/system/docker.mqtt.service"
     mode: "0644"
   become: true
   notify: daemon_reload
   when: ansible_facts['os_family'] == "Debian"
 
-- name: Create a podman container first
-  shell: "podman run -d -p 1883:1883 -p 9001:9001  {{ image_name }} --name {{ name }} && podman stop {{ name }}"
+- name: Inspect if the pod is running already
+  shell: "podman ps -a"
   become: true
+  tags: shell
+  register: container_status
   when: ansible_facts['os_family'] == "RedHat"
 
+- name: print
+  debug:
+    msg: "{{ container_status.stdout.find('mqtt_name') }}"
+  tags: shell
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Remove the container already running
+  shell: "podman rm -f {{ name }}"
+  become: true
+  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mqtt_name') != -1
+
+
+- name: Create a podman container first
+  shell: "podman run -d -p 1883:1883 -p 9001:9001 --name {{ name }} {{ image_name }}:latest  && podman stop {{ name }}"
+  become: true
+  when: ansible_facts['os_family'] == "RedHat" 
+
+- name: Check if the systemd unit files exists
+  stat:
+    path: "/tmp/container-{{ name }}.service"
+  register: file_status
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: print
+  debug:
+    msg: "{{ file_status.stat.exists }}"
+  tags: shell
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Create a container as systemd service unit file
   shell: "cd /tmp/ && podman generate systemd --name {{ name }} --new --files"
   become: yes
-  when: ansible_facts['os_family'] == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat" and file_status.stat.exists != True
 
 - name: Copy the file into the appropriate location
   copy:
@@ -65,8 +127,11 @@
     remote_src: yes
     mode: "0644"
   become: yes
-  when: ansible_facts['os_family'] == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mqtt_name') == -1
   notify: daemon_reload
+
+- name: FLush Handlers
+  meta: flush_handlers
 
 - name: Start the service of container
   service: 
@@ -82,6 +147,7 @@
     permanent: yes
     immediate: yes
   when: ansible_facts['os_family'] == "RedHat"
+  become: true
   loop:
       - 1883
       - 9001
@@ -92,6 +158,7 @@
     proto: tcp
     rule: allow
   when: ansible_facts['os_family'] == "Debian"
+  become: true
   loop:
       - 1883
       - 9001

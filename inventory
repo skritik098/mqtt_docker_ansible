@@ -1,2 +1,2 @@
 [mqtt]
-localhost ansible_user= ansible_password=
+ec2-15-207-55-168.ap-south-1.compute.amazonaws.com ansible_user=ubuntu ansible_private_key_file=/Users/kritiksachdeva/Downloads/aws_key.pem
