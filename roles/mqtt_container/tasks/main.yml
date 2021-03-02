@@ -1,0 +1,98 @@
+---
+# tasks file for mqtt_container
+
+- name: Install docker package for Ubuntu
+  apt:
+    name: "docker-ce"
+    state: present
+  become: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Start the docker service for Ubuntu
+  service:
+    name: docker
+    state: started
+    enabled: true
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install podman package for Rhel
+  yum:
+    name: "container-tools"
+    state: present
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Download the docker container image
+  docker_image:
+    name: "{{ image_name }}"
+    source: pull
+    tag: "{{ version }}"
+  become: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Download the podman container image
+  podman_image:
+    name: "{{ image_name }}"
+    tag: "{{ version }}"
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+
+- name: Copy the docker start service file for lunch
+  template:
+    src: "{{ roles_path }}/templates/docker.mqtt.service.j2"
+    dest: "/etc/systemd/system/docker.mqtt.service"
+    mode: "0644"
+  become: true
+  notify: daemon_reload
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Create a podman container first
+  shell: "podman run -d -p 1883:1883 -p 9001:9001  {{ image_name }} --name {{ name }} && podman stop {{ name }}"
+  become: true
+  when: ansible_facts['os_family'] == "RedHat"
+
+
+- name: Create a container as systemd service unit file
+  shell: "cd /tmp/ && podman generate systemd --name {{ name }} --new --files"
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Copy the file into the appropriate location
+  copy:
+    src: "/tmp/container-{{ name }}.service"
+    dest: "/etc/systemd/system/docker.mqtt.service"
+    remote_src: yes
+    mode: "0644"
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+  notify: daemon_reload
+
+- name: Start the service of container
+  service: 
+    name: "docker.mqtt"
+    state: started
+    enabled: true
+  become: true
+
+- name: Adding the firewall rule for Redhat
+  firewalld:
+    port: "{{  item }}/tcp"
+    state: enabled
+    permanent: yes
+    immediate: yes
+  when: ansible_facts['os_family'] == "RedHat"
+  loop:
+      - 1883
+      - 9001
+
+- name: Firewall rule for Ubuntu System
+  ufw:
+    port: "{{ item }}"
+    proto: tcp
+    rule: allow
+  when: ansible_facts['os_family'] == "Debian"
+  loop:
+      - 1883
+      - 9001
+

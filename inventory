@@ -1,0 +1,2 @@
+[mqtt]
+localhost ansible_user= ansible_password=

@@ -1,0 +1,5 @@
+---
+# vars file for mqtt_container
+version: "latest"
+name: "mqtt_name"
+image_name: "eclipse-mosquitto"

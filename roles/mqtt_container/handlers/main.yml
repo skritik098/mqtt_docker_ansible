@@ -1,0 +1,5 @@
+---
+# handlers file for mqtt_container
+- name: Reload Systemd
+  command: systemctl daemon-reload
+  listen: daemon_reload

@@ -1,0 +1,6 @@
+---
+- hosts: mqtt
+  roles:
+    - mqtt_container
+
+    
