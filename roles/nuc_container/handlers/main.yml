@@ -3,3 +3,4 @@
 - name: Reload Systemd
   command: systemctl daemon-reload
   listen: daemon_reload
+  become: true

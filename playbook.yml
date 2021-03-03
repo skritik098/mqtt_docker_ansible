@@ -1,6 +1,6 @@
 ---
-- hosts: mqtt
+- hosts: nuc
   roles:
-    - mqtt_container
+    - nuc_container
 
     

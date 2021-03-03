@@ -113,7 +113,12 @@
 
 
 - name: Create a podman container of Mosquitto first
-  shell: "podman run -d -p 1883:1883 -p 9001:9001 --name {{ mqtt_container }} {{ image_name.0.name }}:latest  && podman stop {{ mqtt_container }}"
+  shell: "podman run -d -p 1883:1883 -p 9001:9001 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
+  become: true
+  when: ansible_facts['os_family'] == "RedHat" 
+
+- name: Create a podman container of Plantuml first
+  shell: "podman run -d -p 8080:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
   become: true
   when: ansible_facts['os_family'] == "RedHat" 
 
@@ -125,7 +130,7 @@
 
 - name: Check if the systemd unit file for Plantuml exists
   stat:
-    path: "/tmp/container-{{ mqtt_container }}.service"
+    path: "/tmp/container-{{ plantuml_container }}.service"
   register: plantuml_file_status
   when: ansible_facts['os_family'] == "RedHat"
 
@@ -142,12 +147,12 @@
   when: ansible_facts['os_family'] == "RedHat"
 
 - name: Create a container for Mosquitto as systemd service unit file
-  shell: "cd /tmp/ && podman generate systemd --name {{ mqtt_conatiner }} --new --files"
+  shell: "cd /tmp/ && podman generate systemd --name {{ mqtt_container }} --new --files"
   become: yes
   when: ansible_facts['os_family'] == "RedHat" and mqtt_file_status.stat.exists != True
 
 - name: Create a container for Plantuml as systemd service unit file
-  shell: "cd /tmp/ && podman generate systemd --name {{ plantuml_conatiner }} --new --files"
+  shell: "cd /tmp/ && podman generate systemd --name {{ plantuml_container }} --new --files"
   become: yes
   when: ansible_facts['os_family'] == "RedHat" and plantuml_file_status.stat.exists != True
 
