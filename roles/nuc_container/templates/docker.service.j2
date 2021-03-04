@@ -1,0 +1,14 @@
+[Unit]
+Description={{ item.name }} prod container
+After=docker.service
+Requires=docker.service
+Wants=syslog.service
+
+[Service]
+TimeoutStartSec=0
+Restart=Always
+ExecStart=/usr/bin/docker start -a {{ item.name }}
+ExecStop=/usr/bin/docker stop --ignore -t 30 {{ item.name }}
+
+[Install]
+WantedBy=multi-user.target

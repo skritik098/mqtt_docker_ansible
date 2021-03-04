@@ -1,0 +1,11 @@
+containers:
+  - name: "mosquitto"
+    image: "eclipse-mosquitto:latest"
+    ports:
+      - "1883:1883"
+      - "9090:9090"
+  - name: "plantuml"
+    image: "plantuml/plantuml-server:tomcat"
+    ports:
+      - "80:8080"
+      - "9001:9001"

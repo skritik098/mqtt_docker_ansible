@@ -1,0 +1,12 @@
+[Unit]
+Description={{ item.name }} prod container
+Wants=syslog.service
+
+[Service]
+TimeoutStartSec=0
+Restart=Always
+ExecStart=/bin/podman start -a {{ item.name }}
+ExecStop=/bin/podman stop --ignore -t 30 {{ item.name }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,13 +1,8 @@
 ---
 # vars file for mqtt_container
-version: "latest"
-mqtt_container: "mosquitto"
-plantuml_container: "plantuml"
-image_name:
-  - name: "eclipse-mosquitto"
-    version: "latest"
-  - name: "plantuml/plantuml-server"
-    version: "tomcat"
-service_name:
-  - "mosquitto"
-  - "plantuml"
+
+# server1.tap.net:
+  
+
+# service2.tap.net:
+#   containers:

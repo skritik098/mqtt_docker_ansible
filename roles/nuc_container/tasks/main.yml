@@ -2,31 +2,29 @@
 # tasks file for mqtt_container
 - name: Download the docker container image
   docker_image:
-    name: "{{ item.name }}"
+    name: "{{ item.image }}"
     source: pull
-    tag: "{{ item.version }}"
   become: yes
   when: ansible_facts['os_family'] == "Debian"
-  loop: "{{ image_name }}"
+  loop: "{{ containers }}"
 
 - name: Download the podman container image
   podman_image:
-    name: "{{ item.name }}"
-    tag: "{{ item.version }}"
+    name: "{{ item.image }}"
   become: yes
   when: ansible_facts['os_family'] == "RedHat"
-  loop: "{{ image_name }}"
+  loop: "{{ containers }}"
 
 
 - name: Copy the docker start service file for launch
   template:
-    src: "docker.{{ item }}.service.j2"
-    dest: "/etc/systemd/system/{{ item }}.service"
+    src: "docker.{{ item.name }}.service.j2"
+    dest: "/etc/systemd/system/{{ item.name }}.service"
     mode: "0644"
   become: true
   notify: daemon_reload
   when: ansible_facts['os_family'] == "Debian"
-  loop: "{{ service_name }}"
+  loop: "{{ containers }}"
 
 - name: Inspect if the docker container is running already
   shell: "docker ps -a"
@@ -36,16 +34,11 @@
   when: ansible_facts['os_family'] == "Debian"
 
 - name: Create a docker container of Mosquitto first
-  shell: "docker run -d -p {{ ansible_default_ipv4['address'] }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && docker stop {{ mqtt_container }}"
+  shell: "docker run -d -p {{ item.ports | join(' -p ') }} --name {{ item.name }} {{ item.image }} && docker stop {{ item.name }}"
   become: true
   changed_when: false
-  when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('mosquitto') == -1
-
-- name: Create a docker container of Plantuml first
-  shell: "docker run -d -p {{ ansible_default_ipv4['address'] }}:80:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && docker stop {{ plantuml_container }}"
-  become: true
-  changed_when: false
-  when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('plantuml') == -1
+  loop: "{{ containers}}"
+  when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('mosquitto') == -1 and docker_status.stdout.find('plantuml') == -1
 
 - name: Inspect if the podman container is running already
   shell: "podman ps -a"
@@ -56,41 +49,32 @@
   when: ansible_facts['os_family'] == "RedHat"
 
 - name: Create a podman container of Mosquitto first
-  shell: "podman run -d -p {{ ansible_default_ipv4['address'] }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
+  shell: "podman run -d -p {{ item.ports| join(' -p ') }} --name {{ item.name }} {{ item.image }}  && podman stop {{ item.name }}"
   become: true
   changed_when: false
-  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mosquitto') == -1
-
-- name: Create a podman container of Plantuml first
-  shell: "podman run -d -p {{ ansible_default_ipv4['address'] }}:80:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
-  become: true
-  changed_when: false
-  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('plantuml') == -1
+  loop: "{{ containers }}"
+  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mosquitto') == -1 and container_status.stdout.find('plantuml') == -1
 
 - name: Copy the file into the appropriate location
   template:
-    src: "podman.{{ item }}.service.j2"
-    dest: "/etc/systemd/system/{{ item }}.service"
+    src: "podman.service.j2"
+    dest: "/etc/systemd/system/{{ item.name }}.service"
     mode: "0644"
   become: yes
-  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mqtt_name') == -1
+  when: ansible_facts['os_family'] == "RedHat" 
   notify: daemon_reload
-  loop:
-    - "{{ mqtt_container }}"
-    - "{{ plantuml_container }}"
+  loop: "{{ containers }}"
 
 - name: FLush Handlers
   meta: flush_handlers
 
 - name: Start the service of container
   service: 
-    name: "{{ item }}"
+    name: "{{ item.name }}"
     state: started
     enabled: true
   become: true
-  loop: 
-    - "{{ mqtt_container }}"
-    - "{{ plantuml_container }}"
+  loop: "{{ containers }}"
 
 - name: Adding the firewall rule for Redhat
   firewalld:

@@ -1,5 +1,5 @@
 ---
-- hosts: nuc
+- hosts: nuc1
   roles:
     - nuc_container
 
