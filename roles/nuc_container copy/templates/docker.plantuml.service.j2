@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTT docker service
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=Always
+ExecStart=/usr/bin/docker run -p 8080:8080 --name {{ plantuml_container }}  {{ image_name.1.name }} 
+ExecStop=/usr/bin/docker stop --ignore {{ plantuml_container }}
+ExecStopPost=/usr/bin/docker rm -f {{ plantuml_container }}
+
+[Install]
+WantedBy=multi-user.target

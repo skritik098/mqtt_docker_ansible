@@ -6,8 +6,8 @@ Wants=syslog.service
 
 [Service]
 Restart=Always
-ExecStart=/usr/bin/docker start -a {{ plantuml_container }} 
-ExecStop=/usr/bin/docker stop --ignore {{ plantuml_container }}
+ExecStart=/usr/bin/podman start -a {{ plantuml_container }} 
+ExecStop=/usr/bin/podman stop --ignore {{ plantuml_container }}
 
 [Install]
 WantedBy=multi-user.target

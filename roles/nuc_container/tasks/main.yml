@@ -1,59 +1,5 @@
 ---
 # tasks file for mqtt_container
-- name: Install aptitude using apt
-  apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
-  when: ansible_facts['os_family'] == "Debian"
-  become: true
-
-
-- name: Install required system packages
-  apt: name={{ item }} state=latest update_cache=yes
-  loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
-  when: ansible_facts['os_family'] == "Debian"
-  become: true
-
-- name: Add Docker GPG apt Key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
-  when: ansible_facts['os_family'] == "Debian"
-  become: true
-
-- name: Add Docker Repository
-  apt_repository:
-    repo: deb https://download.docker.com/linux/ubuntu bionic stable
-    state: present
-  when: ansible_facts['os_family'] == "Debian"
-  become: true
-
-- name: Update apt and install docker-ce
-  apt: update_cache=yes name=docker-ce state=latest
-  when: ansible_facts['os_family'] == "Debian"
-  become: true
-
-- name: Install Docker Module for Python
-  pip:
-    name: docker
-  become: true
-  when: ansible_facts['os_family'] == "Debian"
-
-- name: Start the docker service for Ubuntu
-  service:
-    name: docker
-    state: started
-    enabled: true
-  when: ansible_facts['os_family'] == "Debian"
-  become: true
-
-- name: Install podman package for Rhel
-  yum:
-    name: 
-        - "podman"
-        - "firewalld"
-    state: present
-  become: yes
-  when: ansible_facts['os_family'] == "RedHat"
-
 - name: Download the docker container image
   docker_image:
     name: "{{ item.name }}"
@@ -72,95 +18,59 @@
   loop: "{{ image_name }}"
 
 
-- name: Copy the docker start service file for lunch
+- name: Copy the docker start service file for launch
   template:
     src: "docker.{{ item }}.service.j2"
-    dest: "/etc/systemd/system/docker.{{ item }}.service"
+    dest: "/etc/systemd/system/{{ item }}.service"
     mode: "0644"
   become: true
   notify: daemon_reload
   when: ansible_facts['os_family'] == "Debian"
   loop: "{{ service_name }}"
 
-- name: Inspect if the pod is running already
+- name: Inspect if the docker container is running already
+  shell: "docker ps -a"
+  become: true
+  tags: shell
+  register: docker_status
+  when: ansible_facts['os_family'] == "Debian"
+
+
+- name: Create a docker container of Mosquitto first
+  shell: "docker run -d -p {{ inventory_hostname }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
+  become: true
+  change_when: false
+  when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('mosquitto') == -1
+
+- name: Create a docker container of Plantuml first
+  shell: "docker run -d -p {{ inventory_hostname }}:8080:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
+  become: true
+  change_when: false
+  when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('plantuml') == -1
+
+- name: Inspect if the podman container is running already
   shell: "podman ps -a"
   become: true
   tags: shell
   register: container_status
   when: ansible_facts['os_family'] == "RedHat"
 
-- name: print status of Moquitto container
-  debug:
-    msg: "{{ container_status.stdout.find('mosquitto') }}"
-  tags: shell
-  when: ansible_facts['os_family'] == "RedHat"
-
-- name: print status of Plantuml container
-  debug:
-    msg: "{{ container_status.stdout.find('plantuml') }}"
-  tags: shell
-  when: ansible_facts['os_family'] == "RedHat"
-
-- name: Remove the Mosquitto container already running
-  shell: "podman rm -f {{ mqtt_container }}"
-  become: true
-  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mosquitto') != -1
-
-- name: Remove the Plantuml container already running
-  shell: "podman rm -f {{ plantuml_container }}"
-  become: true
-  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('plantuml') != -1
-
-
 - name: Create a podman container of Mosquitto first
-  shell: "podman run -d -p 1883:1883 -p 9001:9001 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
+  shell: "podman run -d -p {{ inventory_hostname }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
   become: true
-  when: ansible_facts['os_family'] == "RedHat" 
+  change_when: false
+  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mosquitto') == -1
 
 - name: Create a podman container of Plantuml first
-  shell: "podman run -d -p 8080:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
+  shell: "podman run -d -p {{ inventory_hostname }}:8080:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
   become: true
-  when: ansible_facts['os_family'] == "RedHat" 
-
-- name: Check if the systemd unit file for Mosquitto exists
-  stat:
-    path: "/tmp/container-{{ mqtt_container }}.service"
-  register: mqtt_file_status
-  when: ansible_facts['os_family'] == "RedHat"
-
-- name: Check if the systemd unit file for Plantuml exists
-  stat:
-    path: "/tmp/container-{{ plantuml_container }}.service"
-  register: plantuml_file_status
-  when: ansible_facts['os_family'] == "RedHat"
-
-- name: print the Mosquitto systemd file existence status
-  debug:
-    msg: "{{ mqtt_file_status.stat.exists }}"
-  tags: shell
-  when: ansible_facts['os_family'] == "RedHat"
-
-- name: print the Plantuml systemd file existence status
-  debug:
-    msg: "{{ plantuml_file_status.stat.exists }}"
-  tags: shell
-  when: ansible_facts['os_family'] == "RedHat"
-
-- name: Create a container for Mosquitto as systemd service unit file
-  shell: "cd /tmp/ && podman generate systemd --name {{ mqtt_container }} --new --files"
-  become: yes
-  when: ansible_facts['os_family'] == "RedHat" and mqtt_file_status.stat.exists != True
-
-- name: Create a container for Plantuml as systemd service unit file
-  shell: "cd /tmp/ && podman generate systemd --name {{ plantuml_container }} --new --files"
-  become: yes
-  when: ansible_facts['os_family'] == "RedHat" and plantuml_file_status.stat.exists != True
-
+  change_when: false
+  when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('plantuml') == -1
 
 - name: Copy the file into the appropriate location
-  copy:
-    src: "/tmp/container-{{ item }}.service"
-    dest: "/etc/systemd/system/docker.{{ item }}.service"
+  template:
+    src: "podman.{{ item }}.service"
+    dest: "/etc/systemd/system/{{ item }}.service"
     remote_src: yes
     mode: "0644"
   become: yes
@@ -175,7 +85,7 @@
 
 - name: Start the service of container
   service: 
-    name: "docker.{{ item }}"
+    name: "{{ item }}"
     state: started
     enabled: true
   become: true

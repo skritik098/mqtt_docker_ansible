@@ -7,8 +7,8 @@ Wants=syslog.service
 [Service]
 TimeoutStartSec=0
 Restart=Always
-ExecStart=/usr/bin/docker start -a {{ mqtt_container }}
-ExecStop=/usr/bin/docker stop --ignore -t 30 {{ mqtt_container }}
+ExecStart=/usr/bin/podman start -a {{ mqtt_container }}
+ExecStop=/usr/bin/podman stop --ignore -t 30 {{ mqtt_container }}
 
 [Install]
 WantedBy=multi-user.target
