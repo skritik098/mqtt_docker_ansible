@@ -35,17 +35,16 @@
   register: docker_status
   when: ansible_facts['os_family'] == "Debian"
 
-
 - name: Create a docker container of Mosquitto first
-  shell: "docker run -d -p {{ inventory_hostname }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
+  shell: "docker run -d -p {{ ansible_default_ipv4['address'] }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && docker stop {{ mqtt_container }}"
   become: true
-  change_when: false
+  changed_when: false
   when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('mosquitto') == -1
 
 - name: Create a docker container of Plantuml first
-  shell: "docker run -d -p {{ inventory_hostname }}:80:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
+  shell: "docker run -d -p {{ ansible_default_ipv4['address'] }}:80:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && docker stop {{ plantuml_container }}"
   become: true
-  change_when: false
+  changed_when: false
   when: ansible_facts['os_family'] == "Debian" and docker_status.stdout.find('plantuml') == -1
 
 - name: Inspect if the podman container is running already
@@ -53,25 +52,25 @@
   become: true
   tags: shell
   register: container_status
+  changed_when: false
   when: ansible_facts['os_family'] == "RedHat"
 
 - name: Create a podman container of Mosquitto first
-  shell: "podman run -d -p {{ inventory_hostname }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
+  shell: "podman run -d -p {{ ansible_default_ipv4['address'] }}:1883:1883 --name {{ mqtt_container }} {{ image_name.0.name }}:{{ image_name.0.version }}  && podman stop {{ mqtt_container }}"
   become: true
-  change_when: false
+  changed_when: false
   when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mosquitto') == -1
 
 - name: Create a podman container of Plantuml first
-  shell: "podman run -d -p {{ inventory_hostname }}:80:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
+  shell: "podman run -d -p {{ ansible_default_ipv4['address'] }}:80:8080 --name {{ plantuml_container }} {{ image_name.1.name }}:{{ image_name.1.version }} && podman stop {{ plantuml_container }}"
   become: true
-  change_when: false
+  changed_when: false
   when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('plantuml') == -1
 
 - name: Copy the file into the appropriate location
   template:
-    src: "podman.{{ item }}.service"
+    src: "podman.{{ item }}.service.j2"
     dest: "/etc/systemd/system/{{ item }}.service"
-    remote_src: yes
     mode: "0644"
   become: yes
   when: ansible_facts['os_family'] == "RedHat" and container_status.stdout.find('mqtt_name') == -1
@@ -103,7 +102,7 @@
   become: true
   loop:
       - 1883
-      - 9001
+      - 80
 
 - name: Firewall rule for Ubuntu System
   ufw:
@@ -114,5 +113,5 @@
   become: true
   loop:
       - 1883
-      - 9001
+      - 80
 

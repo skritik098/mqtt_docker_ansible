@@ -1,14 +1,12 @@
 [Unit]
 Description=MQTT prod container
-After=docker.service
-Requires=docker.service
 Wants=syslog.service
 
 [Service]
 TimeoutStartSec=0
 Restart=Always
-ExecStart=/usr/bin/podman start -a {{ mqtt_container }}
-ExecStop=/usr/bin/podman stop --ignore -t 30 {{ mqtt_container }}
+ExecStart=/bin/podman start -a {{ mqtt_container }}
+ExecStop=/bin/podman stop --ignore -t 30 {{ mqtt_container }}
 
 [Install]
 WantedBy=multi-user.target
